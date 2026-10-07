@@ -27,6 +27,12 @@ TR_TZ = timezone(timedelta(hours=3))
 MAX_SEEN = 500
 
 
+def parse_chat_ids(value: str) -> list[str]:
+    """'111, -100222;333' -> ['111', '-100222', '333'] (virgül, noktalı virgül veya boşlukla ayrılabilir)."""
+    ids = [x for x in re.split(r"[,\s;]+", value) if x]
+    return list(dict.fromkeys(ids))  # tekrarları at, sırayı koru
+
+
 def log(msg: str) -> None:
     print(f"[{datetime.now(TR_TZ):%Y-%m-%d %H:%M:%S}] {msg}", flush=True)
 
@@ -109,6 +115,23 @@ def send_telegram(token: str, chat_id: str, text: str) -> None:
     raise RuntimeError("Telegram mesajı gönderilemedi")
 
 
+def broadcast(token: str, chat_ids: list[str], text: str) -> tuple[int, int]:
+    """Mesajı tüm chat id'lere gönderir. (başarılı, başarısız) sayısını döndürür.
+
+    Bir sohbet (ör. botu engelleyen kullanıcı) hata verse bile diğerlerine gönderim sürer.
+    """
+    ok = bad = 0
+    for cid in chat_ids:
+        try:
+            send_telegram(token, cid, text)
+            ok += 1
+        except RuntimeError as e:
+            bad += 1
+            log(f"HATA: chat {cid} için gönderilemedi: {e}")
+        time.sleep(0.5)
+    return ok, bad
+
+
 def format_message(item: dict) -> str:
     date = f"{item['date']:%d.%m.%Y %H:%M}" if item["date"] else ""
     lines = ["📢 <b>Yeni Duyuru</b>", "", html.escape(item["title"])]
@@ -125,8 +148,8 @@ def main() -> int:
     args = ap.parse_args()
 
     token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-    if not args.dry_run and not (token and chat_id):
+    chat_ids = parse_chat_ids(os.getenv("TELEGRAM_CHAT_ID", ""))
+    if not args.dry_run and not (token and chat_ids):
         log("HATA: TELEGRAM_BOT_TOKEN ve TELEGRAM_CHAT_ID tanımlı olmalı.")
         return 2
 
@@ -150,9 +173,9 @@ def main() -> int:
         if not args.dry_run:
             seen.update(i["id"] for i in items)
             save_state(seen)
-            send_telegram(token, chat_id,
-                          f"✅ ABDİGM duyuru botu aktif. Şu an {len(items)} duyuru kayıtlı; "
-                          "bundan sonra yenileri buraya gelecek.")
+            broadcast(token, chat_ids,
+                      f"✅ ABDİGM duyuru botu aktif. Şu an {len(items)} duyuru kayıtlı; "
+                      "bundan sonra yenileri buraya gelecek.")
         return 0
 
     if not new_items:
@@ -163,15 +186,15 @@ def main() -> int:
         if args.dry_run:
             print("-" * 40, msg, sep="\n")
             continue
-        try:
-            send_telegram(token, chat_id, msg)
+        ok, bad = broadcast(token, chat_ids, msg)
+        if bad:
+            failed = True  # çıkış kodu 1 → Actions'ta kırmızı görünür
+        if ok:
             seen.add(item["id"])
-            log(f"Gönderildi: #{item['id']} {item['title'][:60]}")
-            time.sleep(1)
-        except RuntimeError as e:
-            # Gönderilemeyen duyuru 'görüldü' sayılmaz, bir sonraki çalıştırmada tekrar denenir.
-            log(f"HATA: #{item['id']} gönderilemedi: {e}")
-            failed = True
+            log(f"Gönderildi ({ok}/{len(chat_ids)} sohbet): #{item['id']} {item['title'][:60]}")
+        else:
+            # Hiçbir sohbete gönderilemediyse 'görüldü' sayılmaz, yarın tekrar denenir.
+            log(f"HATA: #{item['id']} hiçbir sohbete gönderilemedi.")
             break
 
     if not args.dry_run:

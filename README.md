@@ -17,6 +17,7 @@
 2. Oluşturduğun bota gidip **Start**'a bas ve herhangi bir mesaj yaz.
 3. Tarayıcıda `https://api.telegram.org/bot<TOKEN>/getUpdates` adresini aç. Çıktıdaki `"chat":{"id": 123456789 ...}` değeri **chat id**'dir.
    - Grup/kanal için: botu gruba/kanala ekle (kanalda yönetici yap), aynı `getUpdates` ile (negatif, `-100...` ile başlayan) id'yi bul.
+   - **Birden fazla alıcı:** `TELEGRAM_CHAT_ID` değerine id'leri virgülle ayırarak yaz, örn. `123456789,987654321,-1001234567890`. Her kişi/grup botla en az bir kez konuşmuş (Start'a basmış) veya gruba eklenmiş olmalı.
 
 ### 2) GitHub Actions ile çalıştır (sunucu gerekmez, ücretsiz)
 1. Bu klasörü yeni bir **GitHub reposuna** yükle (private olabilir).
@@ -60,7 +61,7 @@ Tekrar "ilk çalıştırma" davranışı istersen `state/seen.json` dosyasını 
 | Belirti | Çözüm |
 |---|---|
 | Actions'ta "Besleme alınamadı" | Site yurt dışı IP'lerini (GitHub sunucuları) engelliyor olabilir. Türkiye'deki bir bilgisayar/VPS/Raspberry Pi'de cron yöntemini kullan. |
-| `Telegram hatası 400: chat not found` | Bota önce mesaj atmadın veya chat id yanlış. |
+| `Telegram hatası 400: chat not found` | Bota önce mesaj atmadın veya chat id yanlış. Birden fazla id varsa hata hangi chat için olduğunu logda yazar; diğer sohbetlere gönderim devam eder. |
 | `Telegram hatası 401` | Token hatalı. |
 | Actions `git push` hatası | Workflow permissions "Read and write" olmalı (Kurulum adım 3). |
 | Başka kategori de gelsin | `CATEGORY` değişkenini değiştir (ör. Haberler için `1`). |
