@@ -2,7 +2,7 @@ name: ABDİGM duyuru kontrolü
 
 on:
   schedule:
-    - cron: "0 6 * * *"   # her gün 06:00 UTC = 09:00 (Türkiye saati)
+    - cron: "0 14 * * *"   # her gün 14:00 UTC = 17:00 (Türkiye saati)
   workflow_dispatch:        # Actions sekmesinden elle çalıştırma
 
 permissions:
